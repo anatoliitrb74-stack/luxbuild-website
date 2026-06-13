@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LuxBuild Admin Gallery</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    body{background:#111;color:#f6f2ea;font-family:Inter,Arial,sans-serif}.admin-wrap{max-width:1280px;margin:0 auto;padding:24px}.admin-head{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:18px 0 24px;border-bottom:1px solid rgba(212,168,83,.25);position:sticky;top:0;background:#111;z-index:5}.admin-title h1{font-size:34px;line-height:1;margin:0 0 8px}.admin-title p{margin:0;color:#c8c0b3}.admin-actions{display:flex;gap:10px;flex-wrap:wrap}.admin-btn{border:0;border-radius:0;background:#d4a853;color:#111;font-weight:900;padding:12px 18px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em}.admin-btn.dark{background:#1f1f1f;color:#fff;border:1px solid rgba(212,168,83,.35)}.admin-btn.danger{background:#7d1f1f;color:#fff}.status{margin-top:12px;color:#d4a853;font-weight:700;min-height:22px}.admin-layout{display:grid;grid-template-columns:260px 1fr;gap:22px;margin-top:22px}.cat-list{background:#181818;border:1px solid rgba(212,168,83,.25);padding:12px;position:sticky;top:104px;height:max-content}.cat-item{width:100%;display:flex;justify-content:space-between;gap:8px;padding:12px 10px;margin-bottom:8px;background:#222;color:#fff;border:1px solid transparent;cursor:pointer;text-align:left;font-weight:800}.cat-item.active{background:#d4a853;color:#111}.cat-add{display:flex;gap:8px;margin-top:14px}.cat-add input{min-width:0;flex:1;padding:10px;background:#0e0e0e;border:1px solid rgba(212,168,83,.3);color:#fff}.editor-panel{background:#f3f0e9;color:#111;padding:18px;border:1px solid rgba(212,168,83,.25)}.editor-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:16px}.editor-top h2{margin:0;font-size:28px}.upload-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}.upload-row input[type=file]{background:#fff;border:1px solid #ddd;padding:10px;min-width:250px}.photo-grid-admin{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px}.admin-card{background:#fff;border:1px solid #ddd;box-shadow:0 8px 20px rgba(0,0,0,.08);cursor:grab;position:relative}.admin-card.dragging{opacity:.45}.admin-card img{width:100%;height:160px;object-fit:cover;display:block;background:#ddd}.card-tools{padding:10px;display:grid;gap:8px}.card-tools select,.card-tools button{width:100%;padding:9px;border:1px solid #ddd;background:#f7f7f7}.card-tools button{background:#111;color:#fff;border:0;font-weight:800;cursor:pointer}.drag-hint{font-size:12px;color:#5d554a;margin-bottom:12px}.preview-title{font-weight:900;margin:22px 0 10px}.site-preview{background:#111;padding:18px;color:#fff}.site-preview .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}.site-preview img{width:100%;height:180px;object-fit:cover;display:block}.hidden{display:none!important}@media(max-width:800px){.admin-layout{grid-template-columns:1fr}.cat-list{position:static}.admin-head{position:static}.editor-top{display:block}.admin-actions{margin-top:12px}}
+  </style>
+</head>
+<body>
+  <div class="admin-wrap">
+    <div class="admin-head">
+      <div class="admin-title">
+        <h1>LUX<span class="gold">BUILD</span> Gallery Editor</h1>
+        <p>Upload photos, move them between categories, drag to reorder, then Save.</p>
+        <div class="status" id="status">Loading gallery…</div>
+      </div>
+      <div class="admin-actions">
+        <button class="admin-btn dark" id="loginBtn">Login</button>
+        <a class="admin-btn dark" href="work.html" style="text-decoration:none">Open site gallery</a>
+        <button class="admin-btn" id="saveBtn">Save changes</button>
+      </div>
+    </div>
+
+    <div class="admin-layout">
+      <aside class="cat-list">
+        <div id="catList"></div>
+        <div class="cat-add">
+          <input id="newCat" placeholder="New category">
+          <button class="admin-btn" id="addCat" style="padding:10px">+</button>
+        </div>
+      </aside>
+
+      <main class="editor-panel">
+        <div class="editor-top">
+          <h2 id="catTitle">Category</h2>
+          <button class="admin-btn danger" id="deleteCat">Delete category</button>
+        </div>
+        <div class="upload-row">
+          <input type="file" id="fileInput" accept="image/*" multiple>
+          <button class="admin-btn" id="uploadBtn">Upload photos to this category</button>
+        </div>
+        <div class="drag-hint">Drag photos with your mouse to change order. Use the dropdown to move a photo to another category. Delete removes it from the gallery list.</div>
+        <div id="photoGrid" class="photo-grid-admin"></div>
+        <div class="preview-title">Live preview for this category</div>
+        <div class="site-preview"><div id="previewGrid" class="grid"></div></div>
+      </main>
+    </div>
+  </div>
+
+<script>
+const CLOUD_NAME = 'dlvwxoluu';
+const UPLOAD_PRESET = 'Luxbuild LTD';
+const GALLERY_PATH = 'data/gallery.json';
+let gallery = {categories: []};
+let activeIndex = 0;
+let currentSha = null;
+let currentUser = null;
+
+const statusEl = document.getElementById('status');
+function setStatus(msg){ statusEl.textContent = msg; }
+function imgSrc(item){ const s = typeof item === 'string' ? item : (item && item.image ? item.image : ''); if(!s) return ''; if(s.startsWith('http') || s.startsWith('data:') || s.startsWith('/')) return s; if(s.startsWith('images/')) return s; return 'images/'+s; }
+function normalize(){
+  if(!gallery || !Array.isArray(gallery.categories)) gallery = {categories: []};
+  gallery.categories.forEach(c=>{ if(!Array.isArray(c.photos)) c.photos=[]; c.photos = c.photos.map(p=> typeof p === 'string' ? {image:p} : p).filter(p=>p && p.image); });
+  if(!gallery.categories.length) gallery.categories.push({title:'Kitchens', photos:[]});
+  if(activeIndex >= gallery.categories.length) activeIndex = 0;
+}
+function renderCats(){
+  const box = document.getElementById('catList'); box.innerHTML='';
+  gallery.categories.forEach((cat,i)=>{ const b=document.createElement('button'); b.className='cat-item'+(i===activeIndex?' active':''); b.innerHTML=`<span>${cat.title}</span><span>${cat.photos.length}</span>`; b.onclick=()=>{activeIndex=i;render();}; box.appendChild(b); });
+}
+function render(){
+  normalize(); renderCats();
+  const cat = gallery.categories[activeIndex];
+  document.getElementById('catTitle').textContent = cat.title;
+  const grid = document.getElementById('photoGrid'); grid.innerHTML='';
+  cat.photos.forEach((photo,idx)=>{
+    const card=document.createElement('div'); card.className='admin-card'; card.draggable=true; card.dataset.index=idx;
+    card.innerHTML=`<img src="${imgSrc(photo)}"><div class="card-tools"><select>${gallery.categories.map((c,i)=>`<option value="${i}" ${i===activeIndex?'selected':''}>${c.title}</option>`).join('')}</select><button type="button">Delete</button></div>`;
+    card.querySelector('select').onchange=e=>{ movePhoto(idx, Number(e.target.value)); };
+    card.querySelector('button').onclick=()=>{ cat.photos.splice(idx,1); render(); };
+    card.addEventListener('dragstart',()=>card.classList.add('dragging'));
+    card.addEventListener('dragend',()=>card.classList.remove('dragging'));
+    card.addEventListener('dragover',e=>e.preventDefault());
+    card.addEventListener('drop',e=>{ e.preventDefault(); const from=Number(document.querySelector('.dragging')?.dataset.index); const to=Number(card.dataset.index); if(Number.isFinite(from)&&Number.isFinite(to)&&from!==to){ const [m]=cat.photos.splice(from,1); cat.photos.splice(to,0,m); render(); }});
+    grid.appendChild(card);
+  });
+  const prev=document.getElementById('previewGrid'); prev.innerHTML='';
+  cat.photos.forEach(p=>{ const im=document.createElement('img'); im.src=imgSrc(p); prev.appendChild(im); });
+}
+function movePhoto(photoIndex,targetIndex){ if(targetIndex===activeIndex)return; const fromCat=gallery.categories[activeIndex]; const [p]=fromCat.photos.splice(photoIndex,1); gallery.categories[targetIndex].photos.push(p); activeIndex=targetIndex; render(); }
+
+async function loadPublic(){
+  try{ const res=await fetch(GALLERY_PATH+'?v='+Date.now()); gallery=await res.json(); normalize(); setStatus('Gallery loaded. Login before saving.'); render(); } catch(e){ setStatus('Could not load gallery.json'); render(); }
+}
+async function loadViaGateway(){
+  const token=currentUser && currentUser.token && currentUser.token.access_token;
+  if(!token){ await loadPublic(); return; }
+  try{
+    const res=await fetch('/.netlify/git/github/contents/'+GALLERY_PATH,{headers:{Authorization:'Bearer '+token}});
+    if(!res.ok) throw new Error(await res.text());
+    const json=await res.json(); currentSha=json.sha; gallery=JSON.parse(atob(json.content.replace(/\n/g,''))); normalize(); setStatus('Logged in. You can edit and save.'); render();
+  }catch(e){ console.error(e); setStatus('Logged in, but Git Gateway load failed. Public gallery loaded.'); await loadPublic(); }
+}
+async function uploadFiles(){
+  const files=[...document.getElementById('fileInput').files];
+  if(!files.length){ setStatus('Choose photos first.'); return; }
+  setStatus('Uploading '+files.length+' photo(s)…');
+  for(const file of files){
+    const fd=new FormData(); fd.append('file',file); fd.append('upload_preset',UPLOAD_PRESET); fd.append('folder','luxbuild');
+    const res=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:'POST',body:fd});
+    if(!res.ok){ const t=await res.text(); console.error(t); setStatus('Upload failed. Check Cloudinary preset.'); return; }
+    const out=await res.json(); gallery.categories[activeIndex].photos.push({image:out.secure_url});
+  }
+  document.getElementById('fileInput').value=''; render(); setStatus('Uploaded. Drag/reorder if needed, then Save changes.');
+}
+function b64Unicode(str){ return btoa(unescape(encodeURIComponent(str))); }
+async function saveChanges(){
+  const token=currentUser && currentUser.token && currentUser.token.access_token;
+  if(!token){ setStatus('Login first, then save.'); netlifyIdentity.open('login'); return; }
+  setStatus('Saving to GitHub…');
+  try{
+    if(!currentSha){ const res=await fetch('/.netlify/git/github/contents/'+GALLERY_PATH,{headers:{Authorization:'Bearer '+token}}); const j=await res.json(); currentSha=j.sha; }
+    const body={message:'Update LuxBuild gallery from admin-gallery', content:b64Unicode(JSON.stringify(gallery,null,2)), sha:currentSha, branch:'main'};
+    const res=await fetch('/.netlify/git/github/contents/'+GALLERY_PATH,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error(await res.text());
+    const out=await res.json(); currentSha=out.content.sha; setStatus('Saved. Netlify will update the live site in about 1–2 minutes.');
+  }catch(e){ console.error(e); setStatus('Save failed. I downloaded a backup gallery.json.'); const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(gallery,null,2)],{type:'application/json'})); a.download='gallery.json'; a.click(); }
+}
+
+document.getElementById('uploadBtn').onclick=uploadFiles;
+document.getElementById('saveBtn').onclick=saveChanges;
+document.getElementById('addCat').onclick=()=>{ const v=document.getElementById('newCat').value.trim(); if(!v)return; gallery.categories.push({title:v,photos:[]}); activeIndex=gallery.categories.length-1; document.getElementById('newCat').value=''; render(); };
+document.getElementById('deleteCat').onclick=()=>{ if(gallery.categories.length<2){ setStatus('Keep at least one category.'); return;} if(confirm('Delete this category from gallery?')){ gallery.categories.splice(activeIndex,1); activeIndex=0; render(); } };
+document.getElementById('loginBtn').onclick=()=>{ if(currentUser){ netlifyIdentity.logout(); } else netlifyIdentity.open('login'); };
+netlifyIdentity.on('init', user=>{ currentUser=user; document.getElementById('loginBtn').textContent=user?'Logout':'Login'; loadViaGateway(); });
+netlifyIdentity.on('login', user=>{ currentUser=user; netlifyIdentity.close(); document.getElementById('loginBtn').textContent='Logout'; loadViaGateway(); });
+netlifyIdentity.on('logout', ()=>{ currentUser=null; document.getElementById('loginBtn').textContent='Login'; loadPublic(); });
+netlifyIdentity.init();
+</script>
+</body>
+</html>
